@@ -1,0 +1,6 @@
+id,image_path,text,page,line_no,split
+p02_l01,images/p02_l01.png,2025년 9월 21일 월요일,2,1,train
+p02_l02,images/p02_l02.png,오늘은 ...,2,2,train
+p02_l03,images/p02_l03.png,아침부터 ...,2,3,train
+p03_l01,images/p03_l01.png,2025년 9월 26일 금요일,3,1,val
+p04_l01,images/p04_l01.png,2025년 11월 27일 목요일,4,1,test

@@ -1,0 +1,226 @@
+“Wi-Fi CSI 기반 실내 구역 침입 감지 및 사람/비사람 구분 알림 시스템”
+Wi-Fi CSI 기반 프라이버시 보존형 실내 침입 감지 시스템
+
+
+메라처럼 ‘형상’을 보는 게 아니라, 전파 교란 패턴으로 ‘사람일 확률’을 판별
+ESP32 계열에서도 CSI 수집과 사람 감지를 공식적으로 지원
+
+CSI가 뭐냐
+
+CSI는 Channel State Information 이야.
+RSSI처럼 “신호 세기 하나”만 보는 게 아니라, Wi-Fi 채널의 서브캐리어별 amplitude/phase 같은 더 세밀한 채널 정보를 본다. 그래서 사람이 지나가거나 자세를 바꾸면 전파 경로가 흔들리고, 그 흔들림 패턴을 가지고 존재/움직임/활동을 추론하는 거야. Espressif도 CSI가 RSSI보다 더 풍부하고, 사람 감지·침입 감지·활동 인식에 유용하다고 설명한다.
+
+
+2) “와이파이 도시락 1개 + ESP32 1개”로 가능하냐
+
+PoC 수준에선 가능하다.
+이건 추측이 아니라 Espressif의 get router CSI 방식 설명에 아예 나와 있다. ESP32가 라우터로 ping을 보내고, 라우터가 돌려주는 패킷에서 CSI를 받아오는 구조고, 장점 항목에 “Only one ESP32 plus router can be completed” 라고 적혀 있다. 대신 단점도 명확하다. 라우터 위치, 지원 Wi-Fi 프로토콜, 다른 연결 기기 영향에 의존한다.
+
+
+
+1차 목표: no motion / non-human motion / human motion
+2차 목표: authorized human / unauthorized human
+
+
+
+네 아이디어를 시스템으로 번역하면
+초기 설치
+감시할 방/구역만 지정
+송신기/수신기 위치 고정
+허용시간대 입력
+반려동물 유무 입력
+초기 학습
+3일 정도 baseline 수집
+empty room / normal background / allowed-time human traffic 수집
+실시간 추론
+motion gate: 움직임이 있는가
+human gate: 그 움직임이 사람인가
+policy gate: 지금이 비허용 시간대인가
+alert: 조건 충족 시 경보
+
+이 구조가 제일 낫다.
+
+
+“3일 + 허용시간대 데이터만으로 사람/비사람 분류 모델을 처음부터 학습” 하는 건 부족할 가능성이 크다.
+3일 데이터는 로컬 환경 적응(calibration) 에는 매우 좋지만, 범용 사람 판별기 자체를 scratch로 학습 하기엔 보통 적다. Wi-Fi sensing 쪽은 환경 변화와 도메인 시프트가 큰 문제라는 점이 최신 벤치마크와 일반화 서베이에서 계속 지적된다.
+
+그래서 더 좋은 구조는:
+
+공개/사전 수집 데이터로 인간 움직임 분류기 pretrain
+너의 집/방 데이터 3일치로 threshold와 마지막 층 또는 normalization만 local tune
+허용시간대 규칙은 별도 policy engine으로 처리
+
+
+
+6) 딥러닝을 메인으로 간다면 어떤 모델이 맞냐
+
+여기서는 욕심을 줄이는 게 중요해.
+
+내 추천
+
+MVP는 CNN + GRU 계열
+이게 제일 낫다.
+
+이유는 간단해.
+
+CSI는 시간축이 있는 시계열이고
+동시에 여러 subcarrier/antenna 축이 있어서
+CNN이 국소 패턴, GRU가 시간 의존성을 잡기 좋다
+
+실제로 최근 비교 연구에서는 CNN+GRU가 UT-HAR에서 강한 성능을 보였고, 다른 연구들도 GRU+attention 같은 경량 구조가 실용적이라고 본다. 반대로 Transformer류는 데이터가 적으면 훨씬 무겁고, SenseFi 계열 분석에서도 작은 CSI 데이터셋에서는 CNN/GRU가 더 현실적이라는 취지의 결과가 나온다.
+
+그래서 모델 우선순위는
+1D CNN + GRU
+CNN + BiLSTM
+GRU + Attention
+Transformer는 나중
+
+이렇게 추천해.
+
+네 프로젝트는 “논문 최고점”보다
+작고 빠르고 튜닝 가능한 모델이 중요하니까.
+
+7) 무슨 데이터로 학습해야 하냐
+
+여기가 제일 중요하다.
+
+정답은 한 종류 데이터로 끝내면 안 된다야.
+
+A. 공개 데이터: 파이프라인 검증용
+
+공개 CSI 데이터셋은 모델 구조를 먼저 검증하는 데 좋다.
+
+UT-HAR: 초기 HAR 데이터셋으로 자주 쓰임
+NTU-Fi: HAR와 Human ID 태스크 포함, 6개 human activity 등을 담음
+Widar / WiAR: 활동/제스처 인식 쪽 대형 공개셋
+CSI-Bench: 더 최근의 in-the-wild 변동성과 non-human motion까지 일부 포함
+
+하지만 이걸로 네 서비스가 끝나지는 않아.
+왜냐면 이 데이터들은 네 집 구조, 네 공유기 위치, 네 반려동물, 네 허용시간 정책을 반영하지 않기 때문이야.
+
+B. 자체 수집 데이터: 실제 제품 성능용
+
+결국 핵심은 자체 데이터다.
+
+나는 라벨을 이렇게 나누는 걸 추천해.
+
+empty_normal
+nonhuman_motion
+human_motion
+authorized_human
+unauthorized_human 은 실제로 만들기 어려우니, 일단 human_motion + policy violation으로 계산
+
+여기서 핵심은
+unauthorized 를 딥러닝 라벨로 굳이 학습할 필요가 없다는 점이야.
+
+그건 보통:
+
+human_motion == True
+current_time ∉ allowed_window
+
+이면 충분해.
+
+즉 딥러닝 라벨은
+empty / non-human / human
+까지만 잡아도 꽤 강하다.
+
+8) 내가 권하는 최종 구조
+
+이건 거의 설계안이야.
+
+입력
+
+ESP32가 수집한 CSI amplitude/phase window
+예: 1~3초 길이 슬라이딩 윈도우
+
+전처리
+invalid subcarrier 제거
+amplitude normalization
+phase calibration 또는 unwrap
+Hampel / median / low-pass 계열 노이즈 제거
+시간 윈도우 분할
+
+CSI 연구들에서도 filtering, denoising, fusion, amplitude/phase 조합이 기본 파이프라인으로 반복된다.
+
+모델
+
+CNN + GRU 분류기
+출력 클래스:
+
+no motion
+non-human motion
+human motion
+후처리
+연속 n개 윈도우 human_motion일 때만 확정
+allowed schedule 체크
+alert score 누적
+push/telegram/app 알림 발송
+개인화
+초기 3일 데이터로 threshold / BN statistics / 마지막 FC layer 미세조정
+방 재배치 후 재캘리브레이션
+
+이 구조면 네가 원한
+“내 집으로 한정 + 초기세팅 + 3일 학습 + 비허용 시간 경보”
+를 거의 그대로 살릴 수 있어.
+
+9) 그래서 이 주제에서 딥러닝은 메인인가?
+
+응. 메인으로 둘 수 있다.
+다만 “형상 복원”이 아니라 “전파 패턴 기반 사람 판별기” 로 메인인 거야.
+
+정확히는 이렇게 보는 게 맞아.
+
+딥러닝 메인: 사람/비사람/무움직임 분류
+규칙 엔진 메인: 시간대, 허용구역, 알림 정책
+초기 세팅 메인: 로컬 환경 적응
+
+이 세 개가 합쳐져야 제품이 된다.
+
+즉 딥러닝만으로 끝나는 프로젝트가 아니라,
+딥러닝이 핵심 인식 엔진인 시스템 프로젝트에 가깝다.
+
+10) 내 최종 추천
+
+네 아이디어를 가장 설득력 있게 줄이면 이거야.
+
+주제명
+Wi-Fi CSI 기반 프라이버시 보존형 실내 침입 감지 시스템
+
+1차 목표
+
+공유기 1 + ESP32 1
+방 1개 대상
+no motion / human motion / non-human motion
+비허용 시간 human motion일 때 경보
+
+2차 목표
+
+ESP32 2대로 안정화
+반려동물 오탐 감소
+구역별 민감도 설정
+로컬 재학습
+
+버려야 할 욕심
+
+처음부터 사람 자세 복원
+처음부터 집 전체 정밀 위치 추정
+공개 데이터만으로 실사용 수준 완성
+
+이건 버려야 해.
+
+대신 네가 지금 말한 수준,
+즉
+“방 단위, 사람/비사람 판별, 비허용 시간대 경보”
+는 충분히 좋은 프로젝트 범위야. 그리고 이 범위에선 딥러닝을 진짜 메인으로 둘 수 있어.
+
+원하면 다음 답변에서 바로
+하드웨어 구성도, 데이터 수집 라벨 체계, CNN+GRU 입력 텐서 형태, Streamlit 화면 구조까지 구체 설계해줄게.
+
+
+
+"데이터셋"
+https://www.mdpi.com/1424-8220/25/3/918?utm_source=chatgpt.com
+https://arxiv.org/pdf/2207.07859
+https://arxiv.org/pdf/2207.07859
+https://arxiv.org/html/2505.21866v1?utm_source=chatgpt.com
+

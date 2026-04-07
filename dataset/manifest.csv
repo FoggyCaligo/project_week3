@@ -1,0 +1,5 @@
+path,label
+dataset/empty/empty_0001.npy,0
+dataset/empty/empty_0002.npy,0
+dataset/human/human_0001.npy,1
+dataset/human/human_0002.npy,1

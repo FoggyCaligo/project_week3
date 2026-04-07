@@ -1,0 +1,24 @@
+ESP32 CSI quick start
+
+1) Install ESP-IDF in VS Code (official extension).
+2) Clone the official esp-csi repo.
+3) Open:
+   esp-csi/examples/get-started/csi_recv_router
+4) Replace:
+   main/app_main.c
+   with the provided file: esp32_csi_router_logger_app_main.c
+5) Run:
+   idf.py set-target esp32s3
+   idf.py menuconfig
+   -> Example Connection Configuration
+   -> set your Wi-Fi SSID / password
+   -> Components config -> Wi-Fi -> enable Wi-Fi CSI if needed
+6) Flash:
+   idf.py -p COMx flash monitor
+
+The serial output should contain CSV rows like:
+type,seq,mac,rssi,rate,channel,local_timestamp,sig_len,rx_state,len,first_word,data
+CSI_DATA,0,...
+
+Save that serial log to a CSV file.
+Then preprocess it using preprocess_csi_windows.py
