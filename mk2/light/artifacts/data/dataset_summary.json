@@ -1,0 +1,33 @@
+{
+  "full_total_samples": 40429,
+  "total_samples": 4000,
+  "train_samples": 3000,
+  "validation_samples": 500,
+  "test_samples": 500,
+  "full_split_samples": {
+    "train": 32343,
+    "validation": 4043,
+    "test": 4043
+  },
+  "used_split_samples": {
+    "train": 3000,
+    "validation": 500,
+    "test": 500
+  },
+  "label_distribution": {
+    "0": 2080,
+    "1": 1920
+  },
+  "full_label_distribution": {
+    "0": 20119,
+    "1": 20310
+  },
+  "label_distribution_named": {
+    "normal": 2080,
+    "toxic": 1920
+  },
+  "full_label_distribution_named": {
+    "normal": 20119,
+    "toxic": 20310
+  }
+}

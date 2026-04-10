@@ -1,0 +1,14 @@
+{
+  "total_samples": 40429,
+  "train_samples": 32343,
+  "validation_samples": 4043,
+  "test_samples": 4043,
+  "label_distribution": {
+    "0": 20119,
+    "1": 20310
+  },
+  "label_distribution_named": {
+    "normal": 20119,
+    "toxic": 20310
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "model_name": "beomi/KcELECTRA-small-v2022",
+  "max_length": 64,
+  "train_batch_size": 8,
+  "eval_batch_size": 8,
+  "learning_rate": 2e-05,
+  "num_epochs": 1,
+  "validation_metrics": {
+    "eval_accuracy": 0.776,
+    "eval_precision": 0.7354085603112841,
+    "eval_recall": 0.8111587982832618,
+    "eval_f1": 0.7714285714285715,
+    "eval_roc_auc": 0.8504444551606629
+  },
+  "test_metrics": {
+    "eval_accuracy": 0.776,
+    "eval_precision": 0.752895752895753,
+    "eval_recall": 0.8024691358024691,
+    "eval_f1": 0.7768924302788844,
+    "eval_roc_auc": 0.8598261036652736
+  }
+}
